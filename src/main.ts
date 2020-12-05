@@ -1,9 +1,11 @@
 // import { legos } from "@studydefi/money-legos";
 import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
 import { ethers, Wallet, Contract } from "ethers";
+import Alert from './alerts';
 // import kovan from './kovanConfig';
 import { networks } from "../truffle-config.js";
 import axios from "axios";
+import Alerts from "./alerts";
 const BN = require('bn.js');
 require("dotenv").config()
 
@@ -351,12 +353,17 @@ const start = async () => {
     try {
         // await swapETH(token, "2");
         // await approveTokens(token);
-        await swapToken(token);
+        // await swapToken(token);
         // let allowance = await getContractAllowance(contract, process.env.DEV_ACCOUNT_ADDRESS, "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
         // console.log(ethers.utils.formatEther(allowance.toString()));
 
-        const bal = await getTokenBalance(token);
-        console.log(ethers.utils.formatEther(bal.toString()));
+        // const bal = await getTokenBalance(token);
+        // console.log(ethers.utils.formatEther(bal.toString()));
+
+        // setup new alerts 
+
+
+        
 
     } catch (e) {
         console.log(e);
@@ -364,4 +371,19 @@ const start = async () => {
 
 }
 
-setup("dev").then(() => start());
+const myAlerts = async () => {
+
+    // $uni
+    const token = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984');
+    const zora = await Fetcher.fetchTokenData(ChainId.MAINNET, '0xd8e3fb3b08eba982f2754988d70d57edc0055ae6');
+    const alerts = new Alerts();
+
+    alerts.newAlert("ZORA", zora, 850, 1, () => {
+        // alerts.closeAlert("ZORA");
+    });
+
+}
+
+// setup("dev").then(() => start());
+myAlerts();
+

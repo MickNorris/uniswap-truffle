@@ -56,19 +56,7 @@ contract Swap {
 
     }
 
-    // return double what is passed in
-    function double (
-        uint number)
-        external
-        pure
-        returns (uint) {
-        return(number * 5);
-    }
-
-    function me () external view returns(address) {
-        return(msg.sender);
-    }
-
+    // swap ETH -> Tokens
     function swapExactETHForTokens(
     address _token,
     uint _amountOutMin,
@@ -86,7 +74,7 @@ contract Swap {
         path[1] = address(token);
 
         // execute swap
-        uniswap.swapExactETHForTokens.value(msg.value)(
+        uniswap.swapExactETHForTokens{value: msg.value}(
             _amountOutMin,
             path,
             msg.sender,
@@ -95,6 +83,7 @@ contract Swap {
 
     }
 
+    // swap Tokens -> ETH
     function swapExactTokensForETH(
     address _token,
     uint _amountIn,
@@ -105,6 +94,7 @@ contract Swap {
 
         IERC20 token = IERC20(_token);
 
+        // approval is called outside of contract
         // require(token.approve(address(this), _amountIn), "contract approve() failed");
 
         // transfer tokens to smart contract
@@ -116,6 +106,7 @@ contract Swap {
         path[1] = uniswap.WETH();
 
         // approve tokens
+        // approval is called outside of contract
         // require(token.approve(address(uniswap), _amountIn), "uniswap approve() failed");
 
         // execute swap through uniswap
