@@ -1,18 +1,12 @@
 // import { legos } from "@studydefi/money-legos";
-import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
-import { ethers, Wallet, Contract } from "ethers";
-import Alert from './alerts';
-// import kovan from './kovanConfig';
-import { networks } from "../truffle-config.js";
+import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair, ETHER } from "@uniswap/sdk";
+import { ethers, Contract } from "ethers";
 import axios from "axios";
 import Alerts from "./alerts";
-const BN = require('bn.js');
 require("dotenv").config()
 
 
-
 let MyContract;
-let wallet;
 let swap;
 let chain;
 let provider;
@@ -20,29 +14,32 @@ let chainId;
 let weth;
 let signer;
 let account;
+let WALLET_ADDR;
+let PRIVATE_KEY;
+let ETHERSCAN_LINK;
+const SLIPPAGE = 3;
 
 export async function setup(chainName: string) {
 
     // set chain name
     chain = chainName;
 
-    // setup provider
-    /*
-    provider = ethers.getDefaultProvider(chain, {
-        infura: process.env.INFURA_ID
-    })
-    */
+    if (chainName !== "dev") {
+        provider = ethers.getDefaultProvider(chain, {
+            infura: process.env.INFURA_ID
+        });
+    }
 
-    // match chain with ChainId Enum
-    if (chain === "mainnet") {
+    // get contract
+    MyContract = require("./../build/contracts/Swap.json");
 
-        chainId = ChainId.MAINNET;
+    WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS;
+    PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY;
+    ETHERSCAN_LINK = "https://etherscan.io/";
 
-    } else if (chain === "ropsten"){ 
+    let deployedNetwork = MyContract.networks[ChainId.MAINNET];
 
-        chainId = ChainId.ROPSTEN;
-
-    } else if (chain === "dev") {
+    if (chain === "dev") {
 
         // chainId = 5777;
         chainId = ChainId.MAINNET;
@@ -50,26 +47,22 @@ export async function setup(chainName: string) {
         // override provider
         provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:7545');
 
+        // override network
+        // deployedNetwork = MyContract.networks[5777];
+
+        // override keys and addr
+        WALLET_ADDR = process.env.DEV_ACCOUNT_ADDRESS;
+        PRIVATE_KEY = process.env.DEV_ACCOUNT_KEY;
+
     }
 
 
     // get chain WETH
     weth = WETH[ChainId.MAINNET];
 
-    // get contract
-    MyContract = require("./../build/contracts/Swap.json");
-
-    // const contractFlashloanMoneyLegoAddress = FlashloanMoneyLego.networks[kovan.networkID].address;
-
     // setup account
-    signer = new ethers.Wallet(Buffer.from(process.env.DEV_ACCOUNT_KEY, "hex"));
+    signer = new ethers.Wallet(Buffer.from(PRIVATE_KEY, "hex"));
     account = signer.connect(provider);
-
-    // let walletPK = `0x${process.env.DEV_ACCOUNT_KEY}`
-
-    // wallet = new Wallet(walletPK, provider);
-
-    const deployedNetwork = MyContract.networks[5777];
 
     // construct contract
     swap = new Contract(
@@ -78,12 +71,26 @@ export async function setup(chainName: string) {
         account,
     );
 
+    const balance = await getWalletBalance();
 
-    await account.getBalance().then((res: any) => {
-        console.log(`\nWallet balance: ${ethers.utils.formatEther(res.toString())} ETH`);
-    })
+    return balance;
 
 
+}
+
+// get the current account balance
+async function getWalletBalance() {
+
+    try {
+
+        const balanace = await account.getBalance();
+        return balanace;
+
+    } catch (err) {
+        console.log("Failed to load balance: " + err);
+        return null;
+    }
+    
 }
 
 // get the best gas price from eth gas
@@ -133,7 +140,7 @@ export async function approveTokens(inputToken: Token | string) {
     const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
 
     // get the token balance
-    const balance = await tokenContract.balanceOf(process.env.DEV_ACCOUNT_ADDRESS);
+    const balance = await tokenContract.balanceOf(WALLET_ADDR);
     console.log(`Token Balance: ${ethers.utils.formatEther(balance.toString())}`);
 
     // get current gas price
@@ -148,24 +155,24 @@ export async function approveTokens(inputToken: Token | string) {
         gasLimit: '4000000'
     });
 
-    console.log(`Transaction Hash https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
     // wait for transaction to finish 
     try{
         await tx.wait();
     } catch(e) {
-        console.log(`Transaction Failed: https://${chain}.etherscan.io/tx/${tx.hash}`);
+        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
         return;
     }
 
-    console.log(`Transaction Success: https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
 }
 
 
 export async function getTokenBalance(inputToken: Token | string) {
 
-     let token:Token;
+    let token:Token;
     
     // convert string address to token if needed
     if (typeof inputToken === "string")
@@ -173,12 +180,11 @@ export async function getTokenBalance(inputToken: Token | string) {
     else
         token = inputToken
 
-
     // construct contract and get token bal
     const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, provider);
 
     // get the token balance
-    const balance = await contract.balanceOf(process.env.DEV_ACCOUNT_ADDRESS);
+    const balance = await contract.balanceOf(WALLET_ADDR);
 
     return balance;
 
@@ -206,13 +212,10 @@ export async function swapETH(inputToken: Token | string, amountETH: string) {
     const trade = new Trade(route, new TokenAmount(weth, ethers.utils.parseEther(amountETH).toString()), TradeType.EXACT_INPUT);
 
     // smart contract parameters 
-    const slippageTolerance = new Percent('2', '100');
+    const slippageTolerance = new Percent(SLIPPAGE.toString(), '100');
     const amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
-    // const path = [weth.address, token.address];
-    // const to = Config.WALLET_ADDRESS;
     const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
     const value = trade.inputAmount.raw.toString();
-
 
     // get current gas price
     const gasPrice = await getGasPrice("fastest");
@@ -227,28 +230,35 @@ export async function swapETH(inputToken: Token | string, amountETH: string) {
         gasLimit: '4000000'
     });
 
-    console.log(`Transaction Hash https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
     // wait for transaction to finish 
     try{
         await tx.wait();
     } catch(e) {
-        console.log(`Transaction Failed: https://${chain}.etherscan.io/tx/${tx.hash}`);
+        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
         return;
     }
 
-    console.log(`Transaction Success: https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
 }
 
 // swap token for eth 
-export async function swapToken(inputToken: Token | string) {
+export async function swapToken(inputToken: Token | string, attempt?: number) {
+
+    // if has gone terribly wrong
+    // TODO: alert me
+    if (attempt && attempt >= 5){ 
+        console.log("Too many attemps!");
+        return;
+    }
 
     let token:Token;
 
     // convert string address to token if needed
     if (typeof inputToken === "string")
-        token = await Fetcher.fetchTokenData(ChainId.ROPSTEN, inputToken);
+        token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
     else
         token = inputToken;
 
@@ -260,7 +270,7 @@ export async function swapToken(inputToken: Token | string) {
     const pair = await Fetcher.fetchPairData(token, weth);
 
     // get the token balance
-    const balance = await contract.balanceOf(process.env.DEV_ACCOUNT_ADDRESS);
+    const balance = await contract.balanceOf(WALLET_ADDR);
 
     console.log(`Token Balance: ${ethers.utils.formatEther(balance.toString())}`);
 
@@ -272,7 +282,7 @@ export async function swapToken(inputToken: Token | string) {
 
 
     // smart contract parameters 
-    const slippageTolerance = new Percent('5', '100');
+    const slippageTolerance = new Percent(SLIPPAGE.toString(), '100');
     let amountIn = trade.inputAmount.raw.toString();
     let amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
     // const path = [token.address, weth.address];
@@ -304,18 +314,18 @@ export async function swapToken(inputToken: Token | string) {
        gasLimit: '4000000' 
     });
 
-    console.log(`Transaction Hash https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
     // wait for transaction to finish 
     try{
         await tx.wait();
     } catch(e) {
-        console.log(e);
-        console.log(`Transaction Failed: https://${chain}.etherscan.io/tx/${tx.hash}`);
+        // console.log(e);
+        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
         return;
     }
 
-    console.log(`Transaction Success: https://${chain}.etherscan.io/tx/${tx.hash}`);
+    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
 
     return tx;
 
@@ -351,19 +361,22 @@ const start = async () => {
     const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
     
     try {
-        // await swapETH(token, "2");
+
+
+        const walletBal = await getWalletBalance();
+        console.log(ethers.utils.formatEther(walletBal.toString())); 
+        // await swapETH(token, "0.01");
         // await approveTokens(token);
-        // await swapToken(token);
-        // let allowance = await getContractAllowance(contract, process.env.DEV_ACCOUNT_ADDRESS, "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
+        await swapToken(token);
+        // let allowance = await getContractAllowance(contract, WALLET_ADDR, "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
         // console.log(ethers.utils.formatEther(allowance.toString()));
 
         // const bal = await getTokenBalance(token);
         // console.log(ethers.utils.formatEther(bal.toString()));
 
+
+
         // setup new alerts 
-
-
-        
 
     } catch (e) {
         console.log(e);
@@ -384,6 +397,6 @@ const myAlerts = async () => {
 
 }
 
-// setup("dev").then(() => start());
-myAlerts();
+// setup("mainnet").then(() => start());
+// myAlerts();
 

@@ -67,14 +67,13 @@ contract Swap {
         // IERC20(token).transferFrom(msg.sender, address(this), amountOutMin);
         IERC20 token = IERC20(_token);
 
-
         // create exchange path
         address[] memory path = new address[](2);
         path[0] = uniswap.WETH();
         path[1] = address(token);
 
         // execute swap
-        uniswap.swapExactETHForTokens{value: msg.value}(
+        uniswap.swapExactETHForTokens.value(msg.value)(
             _amountOutMin,
             path,
             msg.sender,
@@ -106,8 +105,7 @@ contract Swap {
         path[1] = uniswap.WETH();
 
         // approve tokens
-        // approval is called outside of contract
-        // require(token.approve(address(uniswap), _amountIn), "uniswap approve() failed");
+        require(token.approve(address(uniswap), _amountIn), "uniswap approve() failed");
 
         // execute swap through uniswap
         uniswap.swapExactTokensForETH(

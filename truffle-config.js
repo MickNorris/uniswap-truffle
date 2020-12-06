@@ -13,27 +13,22 @@ module.exports = {
   // for more details on how to specify configuration options!
   networks: {
 
-    development: {
-      host: "127.0.0.1",
-      port: 9495,
-      network_id: "*"
-    }, 
-
     ganache: {
       host: "127.0.0.1",
       port: 7545,
       network_id: "*"
     },
 
-    ropsten: {
+    mainnet: {
       networkCheckTimeout: 1e9,
       provider: function() {
 
-        return new HDWalletProvider(process.env.MNEMONIC, "wss://ropsten.infura.io/ws/v3/" + process.env.INFURA_API_KEY)
+        return new HDWalletProvider(process.env.DEPLOYMENT_ACCOUNT_KEY, "wss://mainnet.infura.io/ws/v3/" + process.env.INFURA_API_KEY)
 
       },
-      network_id: 3
-    } 
+      network_id: 1 
+    },
+
   },
 
   mocha: {
