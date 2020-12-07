@@ -1,4 +1,7 @@
-import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
+require("dotenv").config();
+import { ChainId, Token, WETH } from "@uniswap/sdk";
+import { ethers } from "ethers";
+import  Utils from "./utils";
 
 enum AlertType {
     CrossOver,
@@ -6,9 +9,6 @@ enum AlertType {
 }
 
 interface AlertData{
-    // entry: number,
-    // target: number,
-    // stop: number,
     name: string,
     token: Token,
     target: number,
@@ -17,51 +17,70 @@ interface AlertData{
     active: boolean
 }
 
+// doesn't work if declared inside of class >:(
+let interval;
+
 export default class Alerts{
 
     // class vars
-    alerts: {}
-    WETH: Token
-    USDC: Token
+    alerts: {};
+    WETH: Token;
+    USDC: Token;
+    POLING_TIME: number;
+    provider: ethers.providers.InfuraProvider;
+    quiet: boolean;
+    utils: Utils;
+    
 
     // constructor for new trade
-    constructor() {
+    constructor(_provider, _utils: Utils, _quiet?: boolean) {
+
+        // set quiet flag (don't print anything to console)
+        if (_quiet)
+            this.quiet = true;
+        else 
+            this.quiet = false;
+
+        this.utils = _utils;
+
+        this.provider = _provider;
 
         this.WETH = WETH[ChainId.MAINNET];
 
-        this.USDC = new Token(ChainId.MAINNET, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6);
+        this.USDC = this.utils.getUSDC();
+
+        this.POLING_TIME = 3000;
 
         // create blank alerts object
         this.alerts = {};
 
         // start polling prices
-        setInterval(() => {
-            this.checkAlerts();
-        }, 3000);
+        // this.interval = this.polling(); 
+
+        // start polling
+        this.resetPolling();
 
     }
 
-    // get the price of a token in usdc
-    async getTokenPrice(token: Token) {
-    
-        // get pair data
-        const pairUSD = await Fetcher.fetchPairData(this.WETH, this.USDC);
-        const pair = await Fetcher.fetchPairData(token, this.WETH);
 
-        // get route
-        const route = new Route([pair, pairUSD], token);
+    // setup price polling var
 
-        // get trade for execution price
-        const trade = new Trade(route, new TokenAmount(token, `1${"".padEnd(token.decimals, '0')}`), TradeType.EXACT_INPUT);
+    resetPolling() {
 
-        // get TOKEN/ETH price 
-        const price = trade.executionPrice.toSignificant(6);
+        // get rid of old interval
+        clearInterval(interval);
+        
 
-        return price;
+        // don't create a new interval if one already exists
+        if (interval === undefined)
+            // create new interval
+            interval = setInterval(() => {
+                this.checkAlerts();
+            }, this.POLING_TIME);
 
     }
 
-    // create a new trade
+
     newAlert(name: string, token: Token, target: number, type: AlertType, callback) {
 
         // setup new trade object
@@ -71,11 +90,12 @@ export default class Alerts{
            target,
            type,
            callback,
-           active: true 
+           active: true,
         }
 
         // add alert 
         this.alerts[name] = alert; 
+
     }
 
     // return the list of trades
@@ -89,8 +109,20 @@ export default class Alerts{
     }
 
     // close alert by name
-    closeAlert(name: string) {
+    deleteAlert(name: string) {
+
+        // set alert to innactive 
+        if (this.alerts[name] !== undefined)
+            this.alerts[name].active = false;
+
+        // delete entry
         delete this.alerts[name];
+
+        // create new interval
+        this.resetPolling();
+
+        return(this.alerts[name] === undefined);
+
     }
 
     // check alert by name
@@ -99,8 +131,12 @@ export default class Alerts{
         // get the alert 
         const alert = this.alerts[name];
 
+        // ignore inactive alerts
+        if (alert === undefined || !alert.active)
+            return;
+
         // get the token price
-        const tokenPrice = await this.getTokenPrice(alert.token);
+        const tokenPrice = await this.utils.getTokenPrice(alert.token);
 
         // send alert flag
         let sendAlert = false;
@@ -113,17 +149,29 @@ export default class Alerts{
         }
         
         // trigger callback if target is achieved 
-        if (sendAlert && alert.active)
-            alert.callback();
+        if (sendAlert) {
 
-        console.log(`${alert.name} : \$${tokenPrice}`);
+            // close the alert
+            this.deleteAlert(alert.name);
+
+            // send callback 
+            alert.callback(parseFloat(tokenPrice));
+
+        }
+
+        // print if not quiet
+        if (!this.quiet)
+            console.log(`${alert.name}  : \$${tokenPrice}`);
+
+
 
     }
 
     // check all trades
     checkAlerts() {
         for (const alert in this.alerts) {
-            this.checkAlert(alert);
+            if (alert !== undefined)
+                this.checkAlert(alert);
         }
     }
 

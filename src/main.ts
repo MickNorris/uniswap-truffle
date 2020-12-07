@@ -1,402 +1,161 @@
+require("dotenv").config()
 // import { legos } from "@studydefi/money-legos";
 import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair, ETHER } from "@uniswap/sdk";
 import { ethers, Contract } from "ethers";
 import axios from "axios";
 import Alerts from "./alerts";
-require("dotenv").config()
+import Trades from "./trades";
+import  Utils from "./utils";
 
 
-let MyContract;
-let swap;
-let chain;
-let provider;
-let chainId;
-let weth;
-let signer;
-let account;
-let WALLET_ADDR;
-let PRIVATE_KEY;
-let ETHERSCAN_LINK;
-const SLIPPAGE = 3;
-
-export async function setup(chainName: string) {
-
-    // set chain name
-    chain = chainName;
-
-    if (chainName !== "dev") {
-        provider = ethers.getDefaultProvider(chain, {
-            infura: process.env.INFURA_ID
-        });
-    }
-
-    // get contract
-    MyContract = require("./../build/contracts/Swap.json");
-
-    WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS;
-    PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY;
-    ETHERSCAN_LINK = "https://etherscan.io/";
-
-    let deployedNetwork = MyContract.networks[ChainId.MAINNET];
-
-    if (chain === "dev") {
-
-        // chainId = 5777;
-        chainId = ChainId.MAINNET;
-
-        // override provider
-        provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:7545');
-
-        // override network
-        // deployedNetwork = MyContract.networks[5777];
-
-        // override keys and addr
-        WALLET_ADDR = process.env.DEV_ACCOUNT_ADDRESS;
-        PRIVATE_KEY = process.env.DEV_ACCOUNT_KEY;
-
-    }
-
-
-    // get chain WETH
-    weth = WETH[ChainId.MAINNET];
-
-    // setup account
-    signer = new ethers.Wallet(Buffer.from(PRIVATE_KEY, "hex"));
-    account = signer.connect(provider);
-
-    // construct contract
-    swap = new Contract(
-        deployedNetwork.address,
-        MyContract.abi,
-        account,
+// returns commands usage
+function usage() {
+    return(
+        "commands:\n" + 
+        "new trade [name] [token address] [entry] [target] [exit]\n" + 
+        "new alert [name] [token address] [target] ['over' or 'under']\n" + 
+        "delete alert [name]"
     );
-
-    const balance = await getWalletBalance();
-
-    return balance;
-
-
 }
 
-// get the current account balance
-async function getWalletBalance() {
+const utils = new Utils("dev");
 
-    try {
+// login to discord and wait for initialization to complete
+utils.initDiscord().then(async () => {
 
-        const balanace = await account.getBalance();
-        return balanace;
+    // get provider reference
+    const provider = await utils.getProvider();
 
-    } catch (err) {
-        console.log("Failed to load balance: " + err);
-        return null;
-    }
-    
-}
+    // get discord reference
+    const discord = utils.getDiscord();
 
-// get the best gas price from eth gas
-async function getGasPrice(speed?: string) {
-    
-    // make request w/ axios
-    const price = await axios.get('https://ethgasstation.info/api/ethgasAPI.json?api-key=' + process.env.DEFI_PULSE_KEY)
+    // setup alerts
+    const trades = await new Trades(provider, utils);
+    const uni = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', provider);
 
-    if (speed === "fastest")
-        return(parseInt(price.data.fastest)/10);
-    else if (speed === "fast")
-        return(parseInt(price.data.fast)/10);
-    else 
-        return(parseInt(price.data.average)/10);
+    // utils.swapToken(uni, "5");
 
-}
+    let balance = await utils.getWalletBalance();
+    console.log(ethers.utils.formatEther(balance) + " " + ethers.constants.EtherSymbol);
+
+    // utils.swapETH(uni, "0.05", "5");
+    let tokenBal = await utils.getTokenBalance(uni);
+    console.log(ethers.utils.formatEther(tokenBal) + " UNI");
 
 
-async function getContractAllowance(contract: ethers.Contract, owner: string, spender: string) {
+    return;
 
-    // get allowance
-    const allowance = await contract.allowance(owner, spender);
-
-    return allowance;
-
-}
+    // get provider and setup alerts w/ it
+    const alerts = new Alerts(provider, utils);
 
 
-export async function approveTokens(inputToken: Token | string) {
-
-    let token:Token;
-
-    // convert string address to token if needed
-    if (typeof inputToken === "string")
-        token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
-    else
-        token = token = inputToken;
-
-    // let abi = ["function approve(address _spender, uint256 _value) public returns (bool success)"];
-
-    // get the token/eth pair
-    const pair = await Fetcher.fetchPairData(weth, token);
-    // const pairAddress = Pair.getAddress(token, weth)
-
-    // construct pair contract
-    // const pairContract = new ethers.Contract(pair.liquidityToken.address, process.env.GENERIC_CONTRACT, account);
-    const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
-
-    // get the token balance
-    const balance = await tokenContract.balanceOf(WALLET_ADDR);
-    console.log(`Token Balance: ${ethers.utils.formatEther(balance.toString())}`);
-
-    // get current gas price
-    const gasPrice = await getGasPrice("fastest");
-    const gas = ethers.utils.parseUnits(gasPrice.toString(), "gwei");
-    console.log(`Current Gas Price: ${gasPrice} \n`);
-
-    
-    // approve all tokens by passing in UNIv2 router as spender
-    const tx = await tokenContract.approve('0x7a250d5630b4cf539739df2c5dacb4c659f2488d', balance, {
-        gasPrice: gasPrice * 1e9,
-        gasLimit: '4000000'
+    alerts.newAlert("uni", uni, 3.6, 0, () => {
+        utils.log("target price hit");
     });
 
-    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
+    // listen for messages
+    discord.on("message", async (message: any) => {
 
-    // wait for transaction to finish 
-    try{
-        await tx.wait();
-    } catch(e) {
-        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
-        return;
-    }
+        // is this in the social channel?
+        if (message.channel.id !== process.env.DISCORD_OUTPUT_ID)
+            return;
 
-    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
+        // my discord id
+        const me = '282679916410175488';
 
-}
+        // exit if not me 
+        if (message.author.id !== me)
+            return;
 
+        // get the message content
+        const text = message.content;
 
-export async function getTokenBalance(inputToken: Token | string) {
+        const commands = text.split(" ");
 
-    let token:Token;
-    
-    // convert string address to token if needed
-    if (typeof inputToken === "string")
-        token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
-    else
-        token = inputToken
+        // check for correct command format
+        if (commands.indexOf("help") !== -1) {
+            utils.log(usage());
+            return;
+        }
 
-    // construct contract and get token bal
-    const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, provider);
+        switch (commands[0]) {
 
-    // get the token balance
-    const balance = await contract.balanceOf(WALLET_ADDR);
+            case "new": 
 
-    return balance;
+                if (commands[1] === "alert") {
 
+                    // new alert [name] [token address] [target] ['over' or 'under']
+                    
+                    // exit on incorrect usage
+                    if (commands.length !== 5) {
+                        utils.log(usage());
+                        return;
+                    }
 
-}
+                    // get alert info
+                    const name = commands[2];
+                    const address = commands[3];
+                    const target = commands[4].replace("$","");
+                    const direction = (commands[5] === "over" ? 0 : 1);
 
+                    // get token data
+                    const token = await Fetcher.fetchTokenData(ChainId.MAINNET, address, provider);
 
-export async function swapETH(inputToken: Token | string, amountETH: string) {
+                    // create new alert
+                    alerts.newAlert(name, token, target, direction, (price: number) => {
+                        utils.log(`mph > $${target} (\$${price})`, true);
+                    });
 
-    let token:Token;
-    
-    // convert string address to token if needed
-    if (typeof inputToken === "string")
-        token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
-    else
-        token = inputToken
+                    // send confirmation
+                    if (direction === 0)
+                        utils.log(`new alert created for ${name} to go over \$${target}`);
+                    else 
+                        utils.log(`new alert created for ${name} to go under \$${target}`);
 
-    // get pair data
-    const pair = await Fetcher.fetchPairData(token, weth);
 
-    // get route
-    const route = new Route([pair], weth);
+                } else if (commands[1] === "trade") {
 
-    // get trade for execution price
-    const trade = new Trade(route, new TokenAmount(weth, ethers.utils.parseEther(amountETH).toString()), TradeType.EXACT_INPUT);
+                    // new trade [name] [token address] [entry] [target] [exit] [size]
 
-    // smart contract parameters 
-    const slippageTolerance = new Percent(SLIPPAGE.toString(), '100');
-    const amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
-    const value = trade.inputAmount.raw.toString();
+                    // exit on incorrect usage
+                    if (commands.length !== 8) {
+                        utils.log(usage());
+                        return;
+                    }
 
-    // get current gas price
-    const gasPrice = await getGasPrice("fastest");
 
-    // const gas = ethers.utils.parseUnits(gasPrice.toString(), "gwei");
-    console.log(`Current Gas Price: ${gasPrice} \n`);
+                    // get token
+                    const name = commands[2];
+                    const token = await Fetcher.fetchTokenData(ChainId.MAINNET, commands[3], provider);
+                    const entry = commands[4].replace("$","");
+                    const target = commands[5].replace("$","");
+                    const exit = commands[6].replace("$","");
+                    const size = commands[7].replace("$","");
 
-    // execute swap
-    const tx = await swap.swapExactETHForTokens(token.address, amountOutMin, deadline, {
-        value: value, 
-        gasPrice: gasPrice * 1e9,
-        gasLimit: '4000000'
-    });
+                    trades.newTrade(name, token, entry, target, exit, size);
+                }
 
-    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
+                break;
+                    
+            case "delete": 
 
-    // wait for transaction to finish 
-    try{
-        await tx.wait();
-    } catch(e) {
-        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
-        return;
-    }
+                if (commands.length !== 3) {
+                    utils.log(usage());
+                    return;
+                }
+                const name = commands[2];
 
-    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
+                // delete alert
+                let deleted = await alerts.deleteAlert(name);
 
-}
+                if (deleted) 
+                    utils.log(`${name} deleted`);
 
-// swap token for eth 
-export async function swapToken(inputToken: Token | string, attempt?: number) {
+                break;
+        }
+        
+        
+    })
+});
 
-    // if has gone terribly wrong
-    // TODO: alert me
-    if (attempt && attempt >= 5){ 
-        console.log("Too many attemps!");
-        return;
-    }
-
-    let token:Token;
-
-    // convert string address to token if needed
-    if (typeof inputToken === "string")
-        token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
-    else
-        token = inputToken;
-
-    // construct contract and get token bal
-    const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, provider);
-    // const tokenBal = await contract.balanceOf(Config.WALLET_ADDRESS);
-
-    // get pair data
-    const pair = await Fetcher.fetchPairData(token, weth);
-
-    // get the token balance
-    const balance = await contract.balanceOf(WALLET_ADDR);
-
-    console.log(`Token Balance: ${ethers.utils.formatEther(balance.toString())}`);
-
-    // get route
-    const route = new Route([pair], token);
-
-    // get trade for execution price
-    const trade = new Trade(route, new TokenAmount(token, balance.toString()), TradeType.EXACT_INPUT);
-
-
-    // smart contract parameters 
-    const slippageTolerance = new Percent(SLIPPAGE.toString(), '100');
-    let amountIn = trade.inputAmount.raw.toString();
-    let amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
-    // const path = [token.address, weth.address];
-    // const to = process.env.DEPLOYMENT_ACCOUNT_ADDRESS;
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
-
-    // amountIn = ethers.utils.parseUnits(amountIn).toString();
-    // amountOutMin = ethers.utils.parseUnits(amountOutMin).toString();
-    // console.log(`${amountIn} / ${amountOutMin}`);
-
-    // get contract
-    const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
-
-    // execute approval
-    const approve = await tokenContract.approve(swap.address, amountIn);
-
-    // wait for contract approval
-    await approve.wait();
-
-    // get current gas price
-    const gasPrice = await getGasPrice("fastest");
-
-    // const gas = ethers.utils.parseUnits(gasPrice.toString(), "gwei");
-    console.log(`Current Gas Price: ${gasPrice} \n`);
-
-    // execute swap
-    const tx = await swap.swapExactTokensForETH(token.address, amountIn, amountOutMin, deadline, { 
-       gasPrice: gasPrice * 1e9,
-       gasLimit: '4000000' 
-    });
-
-    console.log(`Transaction: ${ETHERSCAN_LINK}tx/${tx.hash}`);
-
-    // wait for transaction to finish 
-    try{
-        await tx.wait();
-    } catch(e) {
-        // console.log(e);
-        console.log(`Transaction Failed: ${ETHERSCAN_LINK}tx/${tx.hash}`);
-        return;
-    }
-
-    console.log(`Transaction Success: ${ETHERSCAN_LINK}tx/${tx.hash}`);
-
-    return tx;
-
-}
-
-
-const start = async () => {
-
-    /*
-    const tx = await swap.swapExactTokensForETH(
-        '0xc778417e063141139fce010982780140aa0cd5ab', // We would like to borrow DAI (note override to Kovan address)
-        ethers.utils.parseEther("1000"), // We would like to borrow 1000 DAI (in 18 decimals),
-        "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-        { gasLimit: '4000000', },
-    );
-
-    // Inspect the issued transaction
-    console.log(tx);
-
-    // wait for transaction to finish
-    let receipt = await tx.wait();
-
-    // Inspect the transaction receipt
-    console.log(receipt);
-
-    // Inspect the transaction hash
-    console.log("Tx Hash: ", receipt.transactionHash);
-    */
-
-    // $UNI 
-    const token = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984');
-
-    const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
-    
-    try {
-
-
-        const walletBal = await getWalletBalance();
-        console.log(ethers.utils.formatEther(walletBal.toString())); 
-        // await swapETH(token, "0.01");
-        // await approveTokens(token);
-        await swapToken(token);
-        // let allowance = await getContractAllowance(contract, WALLET_ADDR, "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
-        // console.log(ethers.utils.formatEther(allowance.toString()));
-
-        // const bal = await getTokenBalance(token);
-        // console.log(ethers.utils.formatEther(bal.toString()));
-
-
-
-        // setup new alerts 
-
-    } catch (e) {
-        console.log(e);
-    }
-
-}
-
-const myAlerts = async () => {
-
-    // $uni
-    const token = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984');
-    const zora = await Fetcher.fetchTokenData(ChainId.MAINNET, '0xd8e3fb3b08eba982f2754988d70d57edc0055ae6');
-    const alerts = new Alerts();
-
-    alerts.newAlert("ZORA", zora, 850, 1, () => {
-        // alerts.closeAlert("ZORA");
-    });
-
-}
-
-// setup("mainnet").then(() => start());
-// myAlerts();
 
