@@ -161,7 +161,7 @@ export default class Alerts{
 
         // print if not quiet
         if (!this.quiet)
-            console.log(`${alert.name}  : \$${tokenPrice}`);
+            console.log(`${alert.name}: \$${tokenPrice} (${alert.target})`);
 
 
 

@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
+import { Token } from "@uniswap/sdk";
 import { ethers, Contract } from "ethers";
 import  Utils from "./utils";
 import Alerts from "./alerts";
@@ -31,10 +31,11 @@ export default class Trades{
     discord: any;
     utils: Utils;
     SLIPPAGE: number;
+    dry: boolean;
 
 
     // constructor for new trade
-    constructor(_provider, _utils: Utils) {
+    constructor(_provider, _utils: Utils, _alerts: Alerts, _dry?: boolean) {
 
         // create empty trades object
         this.trades = {};
@@ -42,11 +43,17 @@ export default class Trades{
         // set provider
         this.provider = _provider;
 
+        // actually send money or not
+        if (_dry !== undefined)
+            this.dry = _dry;
+        else 
+            this.dry = false;
+
         // set utils
         this.utils = _utils;
 
         // setup new alerts
-        this.alerts = new Alerts(this.provider, _utils);
+        this.alerts = _alerts;
 
     }
 
@@ -66,33 +73,64 @@ export default class Trades{
     }
 
     // add the 'limit' orders (stoploss and take-profit)
-    async addOrders(token, target, stoploss) {
+    async addOrders(token, _name, target, stoploss) {
 
+        const takeProfitName = _name + "-take-profit" ;
+        console.log(target);
 
-        // setup stoploss
-        this.alerts.newAlert(name, token, stoploss, 1, async (price: number) => {
+        // setup take-profit
+        this.alerts.newAlert(takeProfitName, token, target, 0, async (price: number) => {
 
             // swap tokens back to eth
-            // await this.swapToken(token);
+            if (!this.dry)
+                await this.utils.swapToken(token);
 
-            this.utils.log(`stopped out of ${name} @ ${price}`);
+            this.utils.log(`target price reached for ${takeProfitName} @ \$${price}`, true);
 
         });
 
-        // setup take-profit
-        this.alerts.newAlert(name, token, target, 1, async (price: number) => {
+        const stopName = _name + "-stoploss" ;
+
+        // setup stoploss
+        this.alerts.newAlert(stopName, token, stoploss, 1, async (price: number) => {
 
             // swap tokens back to eth
-            // await this.swapToken(token);
+            if (!this.dry)
+                await this.utils.swapToken(token);
 
-            this.utils.log(`target price reached for ${name} @ ${price}`);
+            this.utils.log(`stopped out of ${stopName} @ \$${price}`, true);
 
         });
 
     }
 
+    validateOrders(currentPrice: string, entry: number, target:number , stoploss: number) {
+
+        // validate stoploss
+        if (stoploss >= parseFloat(currentPrice)) { 
+            this.utils.log(`stoploss must be below price @ \$${currentPrice}`, true);
+            return false;
+        }
+
+        // validate take-profit
+        if (target <= parseFloat(currentPrice)) {
+            this.utils.log(`take-profit must be above price @ \$${currentPrice}`, true);
+            return false;
+        }
+
+        return true;
+
+    }
+
     // create a new trade setup
-    async newTrade(name: string, token: Token, entry: number, target: number, stoploss: number, size: number) {
+    async newSetup(name: string, token: Token, entry: number, target: number, stoploss: number, size: number) {
+
+
+        // get token price
+        let currentPrice = await this.utils.getTokenPrice(token);
+
+        if (!this.validateOrders(currentPrice, entry, target, stoploss))
+            return;
 
         // setup new trade object
         let trade:TradeData = {
@@ -108,43 +146,42 @@ export default class Trades{
         // add alert 
         this.trades[name] = trade; 
 
-        // get token price
-        let currentPrice = await this.utils.getTokenPrice(token);
-
         // check price to determine entry 
         if (parseFloat(currentPrice) <= entry) {
 
             // setup entry (price fell to entry)
-            this.alerts.newAlert(name, token, target, 0, async (price: number) => {
+            this.alerts.newAlert(name, token, entry, 0, async (price: number) => {
 
                 // swap eth to tokens
-                // await this.swapETH(token, size.toString());
+                if (!this.dry)
+                    await this.utils.swapETH(token, size.toString()); 
 
                 // add target and stoploss
-                this.addOrders(token, target, stoploss);
+                this.addOrders(token, name, target, stoploss);
 
                 // set trade to active
                 this.trades[name].active = true;
 
-                this.utils.log(`entered ${name} @ ${price} w/ ${size} ETH`);
+                this.utils.log(`entered ${name} @ \$${price} w/ ${size} ${ethers.constants.EtherSymbol}`, true);
 
             })
 
         } else {
 
             // setup entry (price rose to entry)
-            this.alerts.newAlert(name, token, target, 1, async (price: number) => {
+            this.alerts.newAlert(name, token, entry, 1, async (price: number) => {
 
                 // swap eth to tokens
-                // await this.swapETH(token, size.toString());
+                if (!this.dry)
+                    await this.utils.swapETH(token, size.toString()); 
 
                 // add target and stoploss
-                this.addOrders(token, target, stoploss);
+                this.addOrders(token, name, target, stoploss);
 
                 // set trade to active
                 this.trades[name].active = true;
 
-                this.utils.log(`entered ${name} @ ${price} w/ ${size} ETH`);
+                this.utils.log(`entered ${name} @ \$${price} w/ ${size} ${ethers.constants.EtherSymbol}`, true);
 
             })
 
@@ -154,6 +191,48 @@ export default class Trades{
             "```" +
             "Trade setup for " + name + ": (" + size + " " + ethers.constants.EtherSymbol + ")" + 
             "\nentry: $" + entry  + 
+            "\ntarget: $" + target +
+            "\nstop: $" + stoploss+
+            "```");
+
+    }
+
+    // create a new trade setup but enter immediately
+    async newTrade(name: string, token: Token, target: number, stoploss: number, size: number) {
+
+        // get token price
+        let currentPrice = await this.utils.getTokenPrice(token);
+
+        if (!this.validateOrders(currentPrice, parseFloat(currentPrice), target, stoploss))
+            return;
+
+        // setup new trade object
+        let trade:TradeData = {
+            name,
+            token,
+            entry: parseFloat(currentPrice),
+            target,
+            stoploss,
+            size,
+            active: false 
+        }
+
+        // enter trade
+        if (!this.dry)
+            await this.utils.swapETH(token, size.toString()); 
+
+
+        // add alert 
+        this.trades[name] = trade; 
+        this.trades[name].active = true;
+
+        // add target and stoploss
+        this.addOrders(token, name, target, stoploss);
+
+        this.utils.log(
+            "```" +
+            "Trade setup for " + name + ": (" + size + " " + ethers.constants.EtherSymbol + ")" + 
+            "\nentry: $" + currentPrice + 
             "\ntarget: $" + target +
             "\nstop: $" + stoploss+
             "```");

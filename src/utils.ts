@@ -19,6 +19,7 @@ export default class Utils {
     USDC: Token;
     ACCOUNT: ethers.Wallet; 
     CONTRACT: ethers.Contract;
+    slippage: string;
     
     // init utils
     constructor(chainName: string) {
@@ -45,6 +46,9 @@ export default class Utils {
         this.WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS;
         this.PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY;
         this.ETHERSCAN_LINK = "https://etherscan.io/";
+
+        // 3% slippage by default
+        this.slippage = "3";
 
         let deployedNetwork = myContract.networks[ChainId.MAINNET];
 
@@ -80,6 +84,14 @@ export default class Utils {
             this.ACCOUNT,
         );
 
+    }
+
+    getSlippage() {
+        return this.slippage;
+    }
+
+    setSlippage(_slippage: string) {
+        this.slippage = _slippage;
     }
 
     // returns discord instance
@@ -187,7 +199,7 @@ export default class Utils {
     }
 
     // swap token for eth 
-    async swapToken(inputToken: Token | string, slippage: string, attempt?: number) {
+    async swapToken(inputToken: Token | string, attempt?: number) {
 
         // if has gone terribly wrong
         // TODO: alert me
@@ -224,7 +236,7 @@ export default class Utils {
 
 
         // smart contract parameters 
-        const slippageTolerance = new Percent(slippage.toString(), '100');
+        const slippageTolerance = new Percent(this.slippage, '100');
         let amountIn = trade.inputAmount.raw.toString();
         let amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
         // const path = [token.address, weth.address];
@@ -270,7 +282,7 @@ export default class Utils {
     }
 
     // swap amountETH ETH for Token
-    async swapETH(inputToken: Token | string, amountETH: string, slippage: string) {
+    async swapETH(inputToken: Token | string, amountETH: string) {
 
         let token:Token;
         
@@ -290,7 +302,7 @@ export default class Utils {
         const trade = new Trade(route, new TokenAmount(this.WETH, ethers.utils.parseEther(amountETH).toString()), TradeType.EXACT_INPUT);
 
         // smart contract parameters 
-        const slippageTolerance = new Percent(slippage.toString(), '100');
+        const slippageTolerance = new Percent(this.slippage, '100');
         const amountOutMin = trade.minimumAmountOut(slippageTolerance).raw.toString();
         const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
         const value = trade.inputAmount.raw.toString();

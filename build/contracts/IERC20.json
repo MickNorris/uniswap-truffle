@@ -2786,7 +2786,7 @@
                                 "name": "this",
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
-                                "referencedDeclaration": 338,
+                                "referencedDeclaration": 340,
                                 "src": "2632:4:1",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_contract$_Swap_$305",
@@ -6326,7 +6326,7 @@
                                 "name": "this",
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
-                                "referencedDeclaration": 338,
+                                "referencedDeclaration": 340,
                                 "src": "2632:4:1",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_contract$_Swap_$305",
@@ -7335,7 +7335,7 @@
   },
   "networks": {},
   "schemaVersion": "3.3.2",
-  "updatedAt": "2020-12-05T22:17:28.124Z",
+  "updatedAt": "2020-12-07T18:21:15.471Z",
   "devdoc": {
     "methods": {}
   },

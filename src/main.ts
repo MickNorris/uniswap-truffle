@@ -30,28 +30,26 @@ utils.initDiscord().then(async () => {
     const discord = utils.getDiscord();
 
     // setup alerts
-    const trades = await new Trades(provider, utils);
-    const uni = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', provider);
+    const alerts = new Alerts(provider, utils);
 
-    // utils.swapToken(uni, "5");
+    // setup trades 
+    const trades = await new Trades(provider, utils, alerts);
+
+    const uni = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', provider);
+    const mph = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x8888801af4d980682e47f1a9036e589479e835c5', provider);
+
 
     let balance = await utils.getWalletBalance();
     console.log(ethers.utils.formatEther(balance) + " " + ethers.constants.EtherSymbol);
 
     // utils.swapETH(uni, "0.05", "5");
-    let tokenBal = await utils.getTokenBalance(uni);
-    console.log(ethers.utils.formatEther(tokenBal) + " UNI");
+    // let tokenBal = await utils.getTokenBalance(uni);
+    // console.log(ethers.utils.formatEther(tokenBal) + " UNI");
 
 
-    return;
+    // trades.newTrade("mph", mph, 63.77, 49.0, 0.1);
 
     // get provider and setup alerts w/ it
-    const alerts = new Alerts(provider, utils);
-
-
-    alerts.newAlert("uni", uni, 3.6, 0, () => {
-        utils.log("target price hit");
-    });
 
     // listen for messages
     discord.on("message", async (message: any) => {
@@ -87,7 +85,7 @@ utils.initDiscord().then(async () => {
                     // new alert [name] [token address] [target] ['over' or 'under']
                     
                     // exit on incorrect usage
-                    if (commands.length !== 5) {
+                    if (commands.length !== 6) {
                         utils.log(usage());
                         return;
                     }
@@ -98,13 +96,15 @@ utils.initDiscord().then(async () => {
                     const target = commands[4].replace("$","");
                     const direction = (commands[5] === "over" ? 0 : 1);
 
+
                     // get token data
                     const token = await Fetcher.fetchTokenData(ChainId.MAINNET, address, provider);
 
                     // create new alert
                     alerts.newAlert(name, token, target, direction, (price: number) => {
-                        utils.log(`mph > $${target} (\$${price})`, true);
+                        utils.log(`${name} @ \$${price}`, true);
                     });
+
 
                     // send confirmation
                     if (direction === 0)
@@ -123,7 +123,6 @@ utils.initDiscord().then(async () => {
                         return;
                     }
 
-
                     // get token
                     const name = commands[2];
                     const token = await Fetcher.fetchTokenData(ChainId.MAINNET, commands[3], provider);
@@ -132,7 +131,7 @@ utils.initDiscord().then(async () => {
                     const exit = commands[6].replace("$","");
                     const size = commands[7].replace("$","");
 
-                    trades.newTrade(name, token, entry, target, exit, size);
+                    // trades.newTrade(name, token, entry, target, exit, size);
                 }
 
                 break;
@@ -157,5 +156,3 @@ utils.initDiscord().then(async () => {
         
     })
 });
-
-

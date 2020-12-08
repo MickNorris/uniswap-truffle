@@ -2613,7 +2613,7 @@
                                 "name": "this",
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
-                                "referencedDeclaration": 338,
+                                "referencedDeclaration": 340,
                                 "src": "2632:4:1",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_contract$_Swap_$305",
@@ -6153,7 +6153,7 @@
                                 "name": "this",
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
-                                "referencedDeclaration": 338,
+                                "referencedDeclaration": 340,
                                 "src": "2632:4:1",
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_contract$_Swap_$305",
@@ -7164,12 +7164,13 @@
     "1": {
       "events": {},
       "links": {},
-      "address": "0xFECe9F7A2faC91952B42e6F8F2c0F3f37EfBfb41",
-      "transactionHash": "0x56ab6d95f6d208cf590903b9321942589f9d74c78138297c73f97b019987d57c"
+      "address": "0x54e3491059fAe95dEf6926EDCcB1ADd40DFFC437",
+      "transactionHash": "0x2f87021bdb1adafd329a112c413360b0ec0b67eb415c435d74d76315d0053ce7"
     }
   },
   "schemaVersion": "3.3.2",
-  "updatedAt": "2020-12-05T22:17:28.129Z",
+  "updatedAt": "2020-12-07T18:57:21.458Z",
+  "networkType": "ethereum",
   "devdoc": {
     "methods": {}
   },
