@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "main": "truffle-config.js",
+  "type": "commonjs",
   "directories": {
     "test": "test"
   },
   "scripts": {
     "start": "ts-node-dev ./src/main.ts",
-    "test": "tsc ./src/main.ts && truffle test"
+    "test": "tsc ./src/main.ts && truffle test",
+    "bg": "node dist/main.js",
+    "build": "tsc ./src/main.ts --outDir dist"
   },
   "keywords": [],
   "author": "",

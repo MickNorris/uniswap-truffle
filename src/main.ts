@@ -6,6 +6,7 @@ import axios from "axios";
 import Alerts from "./alerts";
 import Trades from "./trades";
 import  Utils from "./utils";
+const Web3 = require('web3');
 
 
 // returns commands usage
@@ -18,7 +19,46 @@ function usage() {
     );
 }
 
-const utils = new Utils("dev");
+
+async function processTranscations() {
+
+    // get web3
+    const web3 = new Web3(process.env.INFURA_URL);
+
+    var subscription = web3.eth.subscribe('pendingTransactions', function(error: any, result: any){
+        if (!error)
+            console.log(result);
+    })
+    .on("data", function(transaction: any){
+        console.log(transaction);
+    });
+    
+
+
+    return;
+
+    web3.eth.subscribe('pendingTransactions', (err: any, res: any) => {
+        if (err)
+            console.log(err);
+        else
+            console.log(res);
+    });
+
+    // get transactions
+    const pending = await web3.eth.getBlock("latest");
+
+    // this should exist
+    if (!pending.transactions)
+        return;
+
+    // iterate through transaction ids
+    for (const id of pending.transactions)
+        console.log(id);
+
+
+}
+
+const utils = new Utils("mainnet");
 
 // login to discord and wait for initialization to complete
 utils.initDiscord().then(async () => {
@@ -26,28 +66,40 @@ utils.initDiscord().then(async () => {
     // get provider reference
     const provider = await utils.getProvider();
 
+    // web3.eth.getPendingTransactions().then(console.log);
+
     // get discord reference
-    const discord = utils.getDiscord();
+    const discord:any = utils.getDiscord();
 
     // setup alerts
     const alerts = new Alerts(provider, utils);
 
     // setup trades 
-    const trades = await new Trades(provider, utils, alerts);
+    // const trades = await new Trades(provider, utils, alerts);
+
+    // console.log(utils.environmentChecker());
 
     const uni = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', provider);
-    const mph = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x8888801af4d980682e47f1a9036e589479e835c5', provider);
+    
+    // utils.swapETH(uni, "0.0001");
+
+    // trades.newSetup("axn", zora, 838, 1069, 743, 1.103);
+    /*
+    alerts.newAlert("uni", uni, 1000, 1, (price: number) => {
+        console.log(price);
+    });
+    */
+
+
+    // const mph = await Fetcher.fetchTokenData(ChainId.MAINNET, '0x8888801af4d980682e47f1a9036e589479e835c5', provider);
 
 
     let balance = await utils.getWalletBalance();
-    console.log(ethers.utils.formatEther(balance) + " " + ethers.constants.EtherSymbol);
+    console.log(`\n${ethers.utils.formatEther(balance)} ${ethers.constants.EtherSymbol}\n`);
 
     // utils.swapETH(uni, "0.05", "5");
     // let tokenBal = await utils.getTokenBalance(uni);
     // console.log(ethers.utils.formatEther(tokenBal) + " UNI");
-
-
-    // trades.newTrade("mph", mph, 63.77, 49.0, 0.1);
 
     // get provider and setup alerts w/ it
 

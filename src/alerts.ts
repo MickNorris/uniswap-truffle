@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { ChainId, Token, WETH } from "@uniswap/sdk";
+import { ChainId, Fetcher, Token, WETH } from "@uniswap/sdk";
 import { ethers } from "ethers";
 import  Utils from "./utils";
 
@@ -18,22 +18,32 @@ interface AlertData{
 }
 
 // doesn't work if declared inside of class >:(
-let interval;
+var interval: NodeJS.Timeout | undefined;
+var alerts: any;
+var polling: boolean;
+
+
+function startPolling(callback: any, pollingInterval: number) {
+    interval = setInterval(async () => {
+        await callback();
+    }, pollingInterval);
+}
+
 
 export default class Alerts{
 
     // class vars
-    alerts: {};
     WETH: Token;
     USDC: Token;
     POLING_TIME: number;
-    provider: ethers.providers.InfuraProvider;
+    provider: ethers.providers.InfuraProvider | ethers.providers.JsonRpcProvider;
     quiet: boolean;
     utils: Utils;
     
 
     // constructor for new trade
-    constructor(_provider, _utils: Utils, _quiet?: boolean) {
+    constructor(_provider: ethers.providers.JsonRpcProvider | ethers.providers.InfuraProvider, 
+        _utils: Utils, _quiet?: boolean) {
 
         // set quiet flag (don't print anything to console)
         if (_quiet)
@@ -50,42 +60,53 @@ export default class Alerts{
         this.USDC = this.utils.getUSDC();
 
         this.POLING_TIME = 3000;
+        
 
-        // create blank alerts object
-        this.alerts = {};
+        // load saved alerts
+        this.loadAlerts();
+        // this.resetPolling();
+
+        // startPolling(this.checkAlerts, this.POLING_TIME);
+
+        polling = true;
+        this.startPolling();
 
         // start polling prices
         // this.interval = this.polling(); 
 
         // start polling
-        this.resetPolling();
+        // this.resetPolling();
 
     }
 
 
     // setup price polling var
+    async startPolling() {
 
-    resetPolling() {
-
-        // get rid of old interval
-        clearInterval(interval);
-        
-
-        // don't create a new interval if one already exists
-        if (interval === undefined)
-            // create new interval
-            interval = setInterval(() => {
-                this.checkAlerts();
-            }, this.POLING_TIME);
+        setInterval(this.checkAlerts.bind(this), this.POLING_TIME);
 
     }
 
 
-    newAlert(name: string, token: Token, target: number, type: AlertType, callback) {
+    async newAlert(_name: string, token: Token, target: number, type: AlertType, callback: any) {
+
+        // wait for alerts to be loaded
+        while (alerts === undefined) await this.utils.wait(500);
+
+        const name = _name.toUpperCase();
+
+        // don't allow duplicate names
+        if (alerts[name] !== undefined) {
+            
+            console.log(`'${name}' already exists!`);
+            this.utils.log(`'${name}' already exists!`);
+            return;
+
+        }
 
         // setup new trade object
         let alert:AlertData = {
-           name: name.toUpperCase(),
+           name,
            token,
            target,
            type,
@@ -94,42 +115,95 @@ export default class Alerts{
         }
 
         // add alert 
-        this.alerts[name] = alert; 
+        alerts[name] = alert;
+
+        this.saveAlerts();
+
+
+    }
+
+
+    // save alerts to file
+    saveAlerts() {
+        this.utils.saveObject(alerts, "alerts");
+    }
+
+    // load alerts from file
+    async loadAlerts() {
+
+        // load the JSON
+        let data = await this.utils.loadObject("alerts.json");
+
+        // turn all Token JSON into Uniswap Tokens
+        for (const _alert in data) {
+
+            const alert = _alert.toUpperCase();
+
+            // set JSON Token to Uniswap Token
+            const token = await Fetcher.fetchTokenData(ChainId.MAINNET, data[alert].token.address, this.provider);
+            data[alert].token = token;
+
+            // set JSON callback to Function
+            const callback = new Function(data[alert].callback);
+            data[alert].callback = callback;
+        }
+
+        // store saved data or start over
+        if (data)
+            alerts = data;
+        else
+            alerts = {};
+
+        return;
 
     }
 
     // return the list of trades
     getAlerts() {
-        return this.alerts; 
+        return alerts; 
     }
 
     // get trade by name
     getAlert(name: string) {
-        return(this.alerts[name]);
+        return(alerts[name.toUpperCase()]);
     }
 
     // close alert by name
-    deleteAlert(name: string) {
+    async deleteAlert(_name: string) {
+
+        while (alerts === undefined) await this.utils.wait(500);
+
+        const name = _name.toUpperCase();
+
+        if (!this.quiet)
+            console.log(`deleting ${name}`);
 
         // set alert to innactive 
-        if (this.alerts[name] !== undefined)
-            this.alerts[name].active = false;
+        if (alerts[name] !== undefined)
+            alerts[name].active = false;
+        else
+            this.utils.log(`'${name}' not found`);
 
         // delete entry
-        delete this.alerts[name];
+        delete alerts[name];
 
         // create new interval
-        this.resetPolling();
+        // this.resetPolling();
 
-        return(this.alerts[name] === undefined);
+        // save alerts to file        
+        this.saveAlerts();
+
+        return(alerts[name] === undefined);
 
     }
 
     // check alert by name
-    async checkAlert(name: string) {
+    async checkAlert(_name: string) {
+
+        const name = _name.toUpperCase();
 
         // get the alert 
-        const alert = this.alerts[name];
+        const alert = alerts[name];
 
         // ignore inactive alerts
         if (alert === undefined || !alert.active)
@@ -152,7 +226,7 @@ export default class Alerts{
         if (sendAlert) {
 
             // close the alert
-            this.deleteAlert(alert.name);
+            await this.deleteAlert(alert.name);
 
             // send callback 
             alert.callback(parseFloat(tokenPrice));
@@ -164,12 +238,11 @@ export default class Alerts{
             console.log(`${alert.name}: \$${tokenPrice} (${alert.target})`);
 
 
-
     }
 
     // check all trades
     checkAlerts() {
-        for (const alert in this.alerts) {
+        for (const alert in alerts) {
             if (alert !== undefined)
                 this.checkAlert(alert);
         }

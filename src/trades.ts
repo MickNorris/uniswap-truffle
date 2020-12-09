@@ -44,10 +44,12 @@ export default class Trades{
         this.provider = _provider;
 
         // actually send money or not
-        if (_dry !== undefined)
+        if (_dry !== undefined) {
+            this.dry = true;
+            console.log("===== dry run =====")
+        } else {
             this.dry = _dry;
-        else 
-            this.dry = false;
+        }
 
         // set utils
         this.utils = _utils;
@@ -238,6 +240,13 @@ export default class Trades{
             "```");
 
     }
+
+    // save alerts to file
+    saveTrades() {
+        this.utils.saveObject(this.trades, "trades");
+    }
+
+
 
     // returns the trade provider
     getProvider() {

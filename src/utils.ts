@@ -3,9 +3,10 @@ import axios from "axios";
 import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
 import { ethers, Contract } from "ethers";
 const Discord = require('discord.js');
+const fs = require('fs');
 
 // this doesn't work if it isn't global :(
-let discord;
+let discord: { login: (arg0: string | undefined) => any; channels: { cache: { get: (arg0: string | undefined) => { (): any; new(): any; send: { (arg0: string): void; new(): any; }; }; }; }; };
 
 export default class Utils {
 
@@ -15,6 +16,7 @@ export default class Utils {
     WALLET_ADDR: string;
     PRIVATE_KEY: string;
     ETHERSCAN_LINK: string;
+    GENERIC_CONTRACT: string;
     WETH: Token;
     USDC: Token;
     ACCOUNT: ethers.Wallet; 
@@ -24,6 +26,7 @@ export default class Utils {
     // init utils
     constructor(chainName: string) {
 
+
         // create empty trades object
         this.trades = {};
 
@@ -31,20 +34,12 @@ export default class Utils {
         // set chain name
         let chain = chainName;
 
-        if (chainName !== "dev") {
-
-            this.provider = new ethers.providers.InfuraProvider("mainnet", {
-                projectId: process.env.INFURA_ID,
-                projectSecret:process.env.INFURA_SECRET 
-            });
-
-        }
-
         // get contract
         let myContract = require("./../build/contracts/Swap.json");
 
-        this.WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS;
-        this.PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY;
+        this.WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS as string;
+        this.PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY as string;
+        this.GENERIC_CONTRACT = process.env.GENERIC_CONTRACT as string;
         this.ETHERSCAN_LINK = "https://etherscan.io/";
 
         // 3% slippage by default
@@ -64,8 +59,16 @@ export default class Utils {
             // deployedNetwork = MyContract.networks[5777];
 
             // override keys and addr
-            this.WALLET_ADDR = process.env.DEV_ACCOUNT_ADDRESS;
-            this.PRIVATE_KEY = process.env.DEV_ACCOUNT_KEY;
+            this.WALLET_ADDR = process.env.DEV_ACCOUNT_ADDRESS as string;
+            this.PRIVATE_KEY = process.env.DEV_ACCOUNT_KEY as string;
+
+        } else {
+
+            // setup mainnet connection
+            this.provider = new ethers.providers.InfuraProvider("mainnet", {
+                projectId: process.env.INFURA_ID,
+                projectSecret:process.env.INFURA_SECRET 
+            });
 
         }
 
@@ -85,6 +88,52 @@ export default class Utils {
         );
 
     }
+
+
+    // make sure environment variables are set correctly
+    envReady() {
+
+        if (process.env === undefined)
+            this.log("failed to load .env");
+
+        return(process.env !== undefined)
+    }
+
+
+    // wait function
+    async wait(milliseconds: number) {
+        await new Promise(resolve => setTimeout(resolve, milliseconds));
+    }
+
+
+    // write object to file
+    saveObject(obj: object, fileName: string) {
+        fs.writeFile(`${fileName}.json`, JSON.stringify(obj, null, 4), (err: any) => {
+            if (err)
+                console.log(`failed to save ${fileName}.json`);
+        });
+    }
+
+    // load an object from file
+    async loadObject(fileName: string) {
+        
+        // read data from file
+       try {
+
+           const data = fs.readFileSync(fileName, {encoding: 'utf8'});
+           // return JSON 
+           return(JSON.parse(data));
+
+       } catch (err) {
+
+           console.log("stop");
+           return({});
+
+       }
+
+
+    }
+
 
     getSlippage() {
         return this.slippage;
@@ -129,6 +178,8 @@ export default class Utils {
 
     async approveTokens(inputToken: Token | string) {
 
+        if (!this.envReady()) return;
+
         let token:Token;
 
         // convert string address to token if needed
@@ -145,7 +196,7 @@ export default class Utils {
 
         // construct pair contract
         // const pairContract = new ethers.Contract(pair.liquidityToken.address, process.env.GENERIC_CONTRACT, account);
-        const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, this.ACCOUNT);
+        const tokenContract = new ethers.Contract(token.address, this.GENERIC_CONTRACT, this.ACCOUNT);
 
         // get the token balance
         const balance = await tokenContract.balanceOf(this.WALLET_ADDR);
@@ -180,6 +231,8 @@ export default class Utils {
 
     async getTokenBalance(inputToken: Token | string) {
 
+        if (!this.envReady()) return;
+
         let token:Token;
         
         // convert string address to token if needed
@@ -189,7 +242,7 @@ export default class Utils {
             token = inputToken
 
         // construct contract and get token bal
-        const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, this.provider);
+        const contract = new ethers.Contract(token.address, this.GENERIC_CONTRACT, this.provider);
 
         // get the token balance
         const balance = await contract.balanceOf(this.WALLET_ADDR);
@@ -200,6 +253,8 @@ export default class Utils {
 
     // swap token for eth 
     async swapToken(inputToken: Token | string, attempt?: number) {
+
+        if (!this.envReady()) return;
 
         // if has gone terribly wrong
         // TODO: alert me
@@ -217,7 +272,7 @@ export default class Utils {
             token = inputToken;
 
         // construct contract and get token bal
-        const contract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, this.provider);
+        const contract = new ethers.Contract(token.address, this.GENERIC_CONTRACT, this.provider);
         // const tokenBal = await contract.balanceOf(Config.WALLET_ADDRESS);
 
         // get pair data
@@ -244,7 +299,7 @@ export default class Utils {
         const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
 
         // get contract
-        const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, this.ACCOUNT);
+        const tokenContract = new ethers.Contract(token.address, this.GENERIC_CONTRACT, this.ACCOUNT);
 
         // execute approval
         const approve = await tokenContract.approve(this.CONTRACT.address, amountIn);
@@ -270,6 +325,13 @@ export default class Utils {
         try{
             await tx.wait();
         } catch(e) {
+
+            if (attempt === undefined)
+                attempt = 0;
+
+            // try again if transaction fails
+            this.swapToken(token, attempt + 1);
+
             // console.log(e);
             console.log(`Transaction Failed: ${this.ETHERSCAN_LINK}tx/${tx.hash}`);
             return;
@@ -283,6 +345,8 @@ export default class Utils {
 
     // swap amountETH ETH for Token
     async swapETH(inputToken: Token | string, amountETH: string) {
+
+        if (!this.envReady()) return;
 
         let token:Token;
         
@@ -344,15 +408,19 @@ export default class Utils {
 
         } catch (err) {
             console.log("Failed to load balance: " + err);
-            return null;
+            return -1;
         }
         
+    }
+
+    getAccount() {
+        return this.ACCOUNT;
     }
 
     // log output and error message in a discord server
     async log(message: string, mention?: boolean | null) {
 
-        let channelId:string = process.env.DISCORD_OUTPUT_ID;
+        let channelId = process.env.DISCORD_OUTPUT_ID;
 
         // console.log(this.discord.channels);
 
