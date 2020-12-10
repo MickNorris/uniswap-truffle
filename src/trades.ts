@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { Token } from "@uniswap/sdk";
+import { ChainId, Token, WETH } from "@uniswap/sdk";
 import { ethers, Contract } from "ethers";
 import  Utils from "./utils";
 import Alerts from "./alerts";
@@ -19,29 +19,26 @@ interface TradeData{
 export default class Trades{
 
     // class vars
-    trades: {};
+    trades: any;
     alerts: Alerts;
     WETH: Token;
     provider: ethers.providers.InfuraProvider | ethers.providers.JsonRpcProvider;
-    WALLET_ADDR: string;
-    PRIVATE_KEY: string;
-    ETHERSCAN_LINK: string;
-    ACCOUNT: ethers.Wallet;
-    CONTRACT: Contract;
     discord: any;
     utils: Utils;
-    SLIPPAGE: number;
-    dry: boolean;
+    dry: boolean | undefined;
 
 
     // constructor for new trade
-    constructor(_provider, _utils: Utils, _alerts: Alerts, _dry?: boolean) {
+    constructor(_provider: ethers.providers.InfuraProvider | ethers.providers.JsonRpcProvider,
+        _utils: Utils, _alerts: Alerts, _dry?: boolean) {
 
         // create empty trades object
         this.trades = {};
 
         // set provider
         this.provider = _provider;
+
+        this.WETH = WETH[ChainId.MAINNET];
 
         // actually send money or not
         if (_dry !== undefined) {
@@ -64,7 +61,7 @@ export default class Trades{
 
         try {
 
-            const balanace = await this.ACCOUNT.getBalance();
+            const balanace = await this.utils.getAccount().getBalance();
             return balanace;
 
         } catch (err) {
@@ -75,7 +72,7 @@ export default class Trades{
     }
 
     // add the 'limit' orders (stoploss and take-profit)
-    async addOrders(token, _name, target, stoploss) {
+    async addOrders(token: Token, _name: string, target: number, stoploss: number) {
 
         const takeProfitName = _name + "-take-profit" ;
         console.log(target);

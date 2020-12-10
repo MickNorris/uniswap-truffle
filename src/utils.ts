@@ -436,6 +436,7 @@ export default class Utils {
     async getTokenPrice(token: Token) {
     
         // get pair data
+        // TODO: store pair data to reduce fetcher calls
         const pairUSD = await Fetcher.fetchPairData(this.WETH, this.USDC, this.provider);
         const pair = await Fetcher.fetchPairData(token, this.WETH, this.provider);
 
