@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "ts-node-dev ./src/main.ts",
-    "test": "tsc ./src/main.ts && truffle test",
+    "test": "truffle compile && truffle test --network ganache",
     "bg": "node dist/main.js",
     "build": "tsc ./src/main.ts --outDir dist"
   },

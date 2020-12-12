@@ -1,51 +1,68 @@
 require("dotenv").config();
 import axios from "axios";
-import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent, Pair } from "@uniswap/sdk";
+import { ChainId, Fetcher, Token, Route, WETH, Trade, TokenAmount, TradeType, Percent } from "@uniswap/sdk";
 import { ethers, Contract } from "ethers";
 const Discord = require('discord.js');
 const fs = require('fs');
 
+// load contracts
+// const YieldFarmer = artifacts.require('../contracts/YieldFarmer.sol');
+
 // this doesn't work if it isn't global :(
 let discord: { login: (arg0: string | undefined) => any; channels: { cache: { get: (arg0: string | undefined) => { (): any; new(): any; send: { (arg0: string): void; new(): any; }; }; }; }; };
 
+export enum AlertType {
+    CrossOver,
+    CrossUnder
+}
+
 export default class Utils {
 
+    
+
     provider: ethers.providers.InfuraProvider | ethers.providers.JsonRpcProvider; 
-    trades: {}
+    tokens: any;
     // discord: any;
     WALLET_ADDR: string;
     PRIVATE_KEY: string;
     ETHERSCAN_LINK: string;
     GENERIC_CONTRACT: string;
     WETH: Token;
-    USDC: Token;
     ACCOUNT: ethers.Wallet; 
     CONTRACT: ethers.Contract;
+    LEVERAGE_CONTRACT: ethers.Contract;
     slippage: string;
+    // tradingMutex: boolean;
+    
     
     // init utils
     constructor(chainName: string) {
 
-
         // create empty trades object
-        this.trades = {};
-
+        this.tokens = {};
 
         // set chain name
         let chain = chainName;
 
         // get contract
-        let myContract = require("./../build/contracts/Swap.json");
+        const swap = require("./../build/contracts/Swap.json");
+        const leverage = require("./../build/contracts/Leverage.json");
 
+        // set constants
         this.WALLET_ADDR = process.env.DEPLOYMENT_ACCOUNT_ADDRESS as string;
         this.PRIVATE_KEY = process.env.DEPLOYMENT_ACCOUNT_KEY as string;
         this.GENERIC_CONTRACT = process.env.GENERIC_CONTRACT as string;
         this.ETHERSCAN_LINK = "https://etherscan.io/";
 
+        // load the saved tokens
+        this.loadTokens();
+
         // 3% slippage by default
         this.slippage = "3";
 
-        let deployedNetwork = myContract.networks[ChainId.MAINNET];
+        const deployedSwap = swap.networks[ChainId.MAINNET];
+        const deployedLeverage = leverage.networks[ChainId.MAINNET] ;
+        // let aasasasaas addf = 
 
         if (chain === "dev") {
 
@@ -74,18 +91,97 @@ export default class Utils {
 
         // get chain WETH
         this.WETH= WETH[ChainId.MAINNET];
-        this.USDC = new Token(ChainId.MAINNET, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6);
 
         // setup account
         const signer = new ethers.Wallet(Buffer.from(this.PRIVATE_KEY, "hex"));
         this.ACCOUNT = signer.connect(this.provider);
 
+        this.LEVERAGE_CONTRACT = new Contract(
+            deployedLeverage.address,
+            leverage.abi,
+            this.ACCOUNT
+        );
+
         // construct contract
         this.CONTRACT = new Contract(
-            deployedNetwork.address,
-            myContract.abi,
+            deployedSwap.address,
+            swap.abi,
             this.ACCOUNT,
         );
+
+    }
+
+    // load tokens from tokens.json
+    async loadTokens () {
+        this.tokens = await this.loadObject("tokens.json");
+    }
+
+    async processTransaction(tx: { hash: any; wait: () => any; }) {
+
+        console.log(`Transaction: ${this.ETHERSCAN_LINK}tx/${tx.hash}`);
+
+        // wait for transaction to finish 
+        try{
+            await tx.wait();
+        } catch(e) {
+            console.log(`Transaction Failed: ${this.ETHERSCAN_LINK}tx/${tx.hash}`);
+            return;
+        }
+
+        console.log(`Transaction Success: ${this.ETHERSCAN_LINK}tx/${tx.hash}`);
+
+
+    }
+
+    // open a leveraged position on Compound Finance
+    async openPosition(token: Token, amountIn: number) {            
+
+        const gasPrice = await this.getGasPrice("fastest");
+        console.log(`Current Gas Price: ${gasPrice} \n`);
+
+        // get contract
+        const tokenContract = new ethers.Contract(token.address, this.GENERIC_CONTRACT, this.ACCOUNT);
+
+        // execute approval
+        const approve = await tokenContract.approve(this.LEVERAGE_CONTRACT.address, amountIn);
+
+        // wait for contract approval
+        await approve.wait();
+
+        // execute swap
+        const tx = await this.LEVERAGE_CONTRACT.openPosition(amountIn,{
+            gasPrice: gasPrice * 1e9,
+            gasLimit: '4000000' 
+        });
+
+        this.processTransaction(tx);
+
+    }
+
+
+    // return Uniswap token data, and store tokens for efficiency 
+    async getToken(address: string) {
+
+        // token to return
+        let token;
+
+        // const address = `0x${_address.substring(2).toUpperCase()}`;
+
+        // const address = _address.toUpperCase();
+
+        // does token already exist?
+        if (this.tokens[address] === undefined) {
+            token = await Fetcher.fetchTokenData(ChainId.MAINNET, address, this.provider);
+            this.tokens[address] = token;
+        } else {
+            // get saved token
+            token = new Token(ChainId.MAINNET, address, this.tokens[address].decimals);
+        }
+
+        // save tokens
+        this.saveObject(this.tokens, "tokens");
+
+        return token;
 
     }
 
@@ -126,7 +222,7 @@ export default class Utils {
 
        } catch (err) {
 
-           console.log("stop");
+           console.log("loading error");
            return({});
 
        }
@@ -146,11 +242,6 @@ export default class Utils {
     // returns discord instance
     getDiscord() {
         return discord;
-    }
-
-    // returns USDC token
-    getUSDC() {
-        return this.USDC;
     }
 
     // initialize discord client
@@ -184,7 +275,7 @@ export default class Utils {
 
         // convert string address to token if needed
         if (typeof inputToken === "string")
-            token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
+            token = await this.getToken(inputToken);
         else
             token = token = inputToken;
 
@@ -237,7 +328,7 @@ export default class Utils {
         
         // convert string address to token if needed
         if (typeof inputToken === "string")
-            token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
+            token = await this.getToken(inputToken);
         else
             token = inputToken
 
@@ -267,7 +358,7 @@ export default class Utils {
 
         // convert string address to token if needed
         if (typeof inputToken === "string")
-            token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
+            token = await this.getToken(inputToken);
         else
             token = inputToken;
 
@@ -352,7 +443,7 @@ export default class Utils {
         
         // convert string address to token if needed
         if (typeof inputToken === "string")
-            token = await Fetcher.fetchTokenData(ChainId.MAINNET, inputToken);
+            token = await this.getToken(inputToken);
         else
             token = inputToken
 
@@ -371,7 +462,6 @@ export default class Utils {
         const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
         const value = trade.inputAmount.raw.toString();
 
-        // get current gas price
         const gasPrice = await this.getGasPrice("fastest");
 
         // const gas = ethers.utils.parseUnits(gasPrice.toString(), "gwei");
@@ -434,10 +524,13 @@ export default class Utils {
 
     // get the price of a token in usdc
     async getTokenPrice(token: Token) {
-    
+
+        // get USDC
+        const USDC = await this.getToken('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
+
         // get pair data
         // TODO: store pair data to reduce fetcher calls
-        const pairUSD = await Fetcher.fetchPairData(this.WETH, this.USDC, this.provider);
+        const pairUSD = await Fetcher.fetchPairData(this.WETH, USDC, this.provider);
         const pair = await Fetcher.fetchPairData(token, this.WETH, this.provider);
 
         // get route

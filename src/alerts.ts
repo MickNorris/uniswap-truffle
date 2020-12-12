@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { ChainId, Fetcher, Token, WETH } from "@uniswap/sdk";
+import { ChainId, Token, WETH } from "@uniswap/sdk";
 import { ethers } from "ethers";
 import  Utils from "./utils";
 
@@ -13,28 +13,22 @@ interface AlertData{
     token: Token,
     target: number,
     type: AlertType,
-    callback: void
-    active: boolean
+    callback: any,
+    active: boolean,
+    orphaned: boolean
 }
 
 // doesn't work if declared inside of class >:(
 var interval: NodeJS.Timeout | undefined;
 var alerts: any;
-var polling: boolean;
 
 
-function startPolling(callback: any, pollingInterval: number) {
-    interval = setInterval(async () => {
-        await callback();
-    }, pollingInterval);
-}
 
 
 export default class Alerts{
 
     // class vars
     WETH: Token;
-    USDC: Token;
     POLING_TIME: number;
     provider: ethers.providers.InfuraProvider | ethers.providers.JsonRpcProvider;
     quiet: boolean;
@@ -57,25 +51,13 @@ export default class Alerts{
 
         this.WETH = WETH[ChainId.MAINNET];
 
-        this.USDC = this.utils.getUSDC();
-
-        this.POLING_TIME = 3000;
-        
+        // check alerts every 5 seconds
+        this.POLING_TIME = 5000;
 
         // load saved alerts
         this.loadAlerts();
-        // this.resetPolling();
 
-        // startPolling(this.checkAlerts, this.POLING_TIME);
-
-        polling = true;
         this.startPolling();
-
-        // start polling prices
-        // this.interval = this.polling(); 
-
-        // start polling
-        // this.resetPolling();
 
     }
 
@@ -88,12 +70,26 @@ export default class Alerts{
     }
 
 
-    async newAlert(_name: string, token: Token, target: number, type: AlertType, callback: any) {
+    async newAlert(_name: string, token: Token, target: number, callback: any) {
 
         // wait for alerts to be loaded
         while (alerts === undefined) await this.utils.wait(500);
 
         const name = _name.toUpperCase();
+
+        // get the current price of the token
+        const currentPrice = await this.utils.getTokenPrice(token);
+
+        // type of alert (over or under)
+        let type;
+
+        if (parseFloat(currentPrice) >= target) {
+            // set alert to trigger if price goes under target
+            type = AlertType.CrossUnder
+        } else {
+            // set alert to trigger if price goes over target
+            type = AlertType.CrossOver;
+        }
 
         // don't allow duplicate names
         if (alerts[name] !== undefined) {
@@ -112,6 +108,7 @@ export default class Alerts{
            type,
            callback,
            active: true,
+           orphaned: false
         }
 
         // add alert 
@@ -140,12 +137,15 @@ export default class Alerts{
             const alert = _alert.toUpperCase();
 
             // set JSON Token to Uniswap Token
-            const token = await Fetcher.fetchTokenData(ChainId.MAINNET, data[alert].token.address, this.provider);
+            const token = await this.utils.getToken(data[alert].token.address);
             data[alert].token = token;
 
             // set JSON callback to Function
-            const callback = new Function(data[alert].callback);
-            data[alert].callback = callback;
+            // const callback = new Function(data[alert].callback);
+            // data[alert].callback = callback;
+
+            // callback doesn't work if the node process is killed
+            data[alert].orphaned = true;
         }
 
         // store saved data or start over
@@ -154,7 +154,7 @@ export default class Alerts{
         else
             alerts = {};
 
-        return;
+        // console.log(alerts);
 
     }
 
@@ -203,7 +203,7 @@ export default class Alerts{
         const name = _name.toUpperCase();
 
         // get the alert 
-        const alert = alerts[name];
+        const alert:AlertData = alerts[name];
 
         // ignore inactive alerts
         if (alert === undefined || !alert.active)
@@ -217,9 +217,9 @@ export default class Alerts{
 
         // what kind of alert is set
         if (alert.type === AlertType.CrossOver) {
-            sendAlert = (parseFloat(tokenPrice) > parseFloat(alert.target))
+            sendAlert = (parseFloat(tokenPrice) > alert.target)
         } else {
-            sendAlert = (parseFloat(tokenPrice) < parseFloat(alert.target))
+            sendAlert = (parseFloat(tokenPrice) < alert.target)
         }
         
         // trigger callback if target is achieved 
@@ -228,8 +228,13 @@ export default class Alerts{
             // close the alert
             await this.deleteAlert(alert.name);
 
-            // send callback 
-            alert.callback(parseFloat(tokenPrice));
+            // send alert
+            // if a node process was killed the callback no
+            // longer works!
+            if (!alert.orphaned)
+                alert.callback(parseFloat(tokenPrice));
+            else
+                this.utils.log(`${name} @ ${parseFloat(tokenPrice)} (target: ${alert.target})`, true);
 
         }
 

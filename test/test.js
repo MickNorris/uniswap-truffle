@@ -1,9 +1,26 @@
 const Swap = artifacts.require("Swap");
-const main = require("../src/main.js");
-const ethers = require("ethers");
-const uniswap = require("@uniswap/sdk");
-// import { tokenToETH } from '../src/main.ts';
+const Leverage = artifacts.require("Leverage");
+const Utils = import("../src/Utils");
+// import { tokenToETH } from '../src/utils.ts';
 
+// const utils = new Utils();
+
+contract('Leverage', function(accounts){
+
+  it("should take out a leveraged loan", () => {
+
+    return Leverage.deployed().then((instance) => {
+      return instance.double.call(num);
+    }).then((balance) => {
+      assert.equal(balance.valueOf(), num * 2, `Expected ${num * 2}; Received ${balance}`);
+    })
+
+
+  })
+
+});
+
+/*
 contract('Swap', function(accounts){
 
   it("should double a number", () => {
@@ -35,7 +52,6 @@ contract('Swap', function(accounts){
         const signer = new ethers.Wallet(Buffer.from(process.env.DEPLOYMENT_ACCOUNT_KEY, "hex"));
         const account = signer.connect(provider);
 
-        const token = await uniswap.Fetcher.fetchTokenData(3, "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984");
         const tokenContract = new ethers.Contract(token.address, process.env.GENERIC_CONTRACT, account);
 
         await main.setup('ropsten', addr);
@@ -69,6 +85,7 @@ contract('Swap', function(accounts){
       });
     });
   });
-  */
 
 });
+
+*/

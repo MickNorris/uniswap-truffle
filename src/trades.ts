@@ -78,7 +78,7 @@ export default class Trades{
         console.log(target);
 
         // setup take-profit
-        this.alerts.newAlert(takeProfitName, token, target, 0, async (price: number) => {
+        this.alerts.newAlert(takeProfitName, token, target, async (price: number) => {
 
             // swap tokens back to eth
             if (!this.dry)
@@ -91,7 +91,7 @@ export default class Trades{
         const stopName = _name + "-stoploss" ;
 
         // setup stoploss
-        this.alerts.newAlert(stopName, token, stoploss, 1, async (price: number) => {
+        this.alerts.newAlert(stopName, token, stoploss, async (price: number) => {
 
             // swap tokens back to eth
             if (!this.dry)
@@ -149,7 +149,7 @@ export default class Trades{
         if (parseFloat(currentPrice) <= entry) {
 
             // setup entry (price fell to entry)
-            this.alerts.newAlert(name, token, entry, 0, async (price: number) => {
+            this.alerts.newAlert(name, token, entry, async (price: number) => {
 
                 // swap eth to tokens
                 if (!this.dry)
@@ -168,7 +168,7 @@ export default class Trades{
         } else {
 
             // setup entry (price rose to entry)
-            this.alerts.newAlert(name, token, entry, 1, async (price: number) => {
+            this.alerts.newAlert(name, token, entry, async (price: number) => {
 
                 // swap eth to tokens
                 if (!this.dry)

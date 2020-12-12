@@ -1,7 +1,8 @@
 .env
 alerts.json
+tokens.json
 trades.json
 node_modules
 dist
-build
+./build/contracts
 icebox

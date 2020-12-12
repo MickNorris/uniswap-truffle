@@ -1,0 +1,340 @@
+{
+  "contractName": "Icomptroller",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "cTokens",
+          "type": "address[]"
+        }
+      ],
+      "name": "enterMarkets",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.6.0+commit.26b70077\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"cTokens\",\"type\":\"address[]\"}],\"name\":\"enterMarkets\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"methods\":{}},\"userdoc\":{\"methods\":{}}},\"settings\":{\"compilationTarget\":{\"/home/nick/Documents/uniswap-truffle/contracts/Icomptroller.sol\":\"Icomptroller\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"/home/nick/Documents/uniswap-truffle/contracts/Icomptroller.sol\":{\"keccak256\":\"0x0088d2a6b61caf569905fb00695822b4ec2ad72525307b19469962e9980c9deb\",\"urls\":[\"bzz-raw://1f8f7a3e1b98c22d6c3051d272c0e70be1948a48c11a4474850070c6ea7b159a\",\"dweb:/ipfs/QmSTp9DECTk3ejSvMk7JWNbxd9YHSbcf7FXvcDDY86iaqL\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "pragma solidity ^0.6.0;\n\ninterface Icomptroller {\n  function enterMarkets(address[] calldata cTokens) external returns (uint[] memory);\n}",
+  "sourcePath": "/home/nick/Documents/uniswap-truffle/contracts/Icomptroller.sol",
+  "ast": {
+    "absolutePath": "/home/nick/Documents/uniswap-truffle/contracts/Icomptroller.sol",
+    "exportedSymbols": {
+      "Icomptroller": [
+        140
+      ]
+    },
+    "id": 141,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 130,
+        "literals": [
+          "solidity",
+          "^",
+          "0.6",
+          ".0"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:23:2"
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "documentation": null,
+        "fullyImplemented": false,
+        "id": 140,
+        "linearizedBaseContracts": [
+          140
+        ],
+        "name": "Icomptroller",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "body": null,
+            "documentation": null,
+            "functionSelector": "c2998238",
+            "id": 139,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "enterMarkets",
+            "nodeType": "FunctionDefinition",
+            "overrides": null,
+            "parameters": {
+              "id": 134,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 133,
+                  "name": "cTokens",
+                  "nodeType": "VariableDeclaration",
+                  "overrides": null,
+                  "scope": 139,
+                  "src": "74:26:2",
+                  "stateVariable": false,
+                  "storageLocation": "calldata",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_address_$dyn_calldata_ptr",
+                    "typeString": "address[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 131,
+                      "name": "address",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "74:7:2",
+                      "stateMutability": "nonpayable",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_address",
+                        "typeString": "address"
+                      }
+                    },
+                    "id": 132,
+                    "length": null,
+                    "nodeType": "ArrayTypeName",
+                    "src": "74:9:2",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                      "typeString": "address[]"
+                    }
+                  },
+                  "value": null,
+                  "visibility": "internal"
+                }
+              ],
+              "src": "73:28:2"
+            },
+            "returnParameters": {
+              "id": 138,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 137,
+                  "name": "",
+                  "nodeType": "VariableDeclaration",
+                  "overrides": null,
+                  "scope": 139,
+                  "src": "120:13:2",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
+                    "typeString": "uint256[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 135,
+                      "name": "uint",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "120:4:2",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_uint256",
+                        "typeString": "uint256"
+                      }
+                    },
+                    "id": 136,
+                    "length": null,
+                    "nodeType": "ArrayTypeName",
+                    "src": "120:6:2",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
+                      "typeString": "uint256[]"
+                    }
+                  },
+                  "value": null,
+                  "visibility": "internal"
+                }
+              ],
+              "src": "119:15:2"
+            },
+            "scope": 140,
+            "src": "52:83:2",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 141,
+        "src": "25:112:2"
+      }
+    ],
+    "src": "0:137:2"
+  },
+  "legacyAST": {
+    "absolutePath": "/home/nick/Documents/uniswap-truffle/contracts/Icomptroller.sol",
+    "exportedSymbols": {
+      "Icomptroller": [
+        140
+      ]
+    },
+    "id": 141,
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 130,
+        "literals": [
+          "solidity",
+          "^",
+          "0.6",
+          ".0"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "0:23:2"
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "documentation": null,
+        "fullyImplemented": false,
+        "id": 140,
+        "linearizedBaseContracts": [
+          140
+        ],
+        "name": "Icomptroller",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "body": null,
+            "documentation": null,
+            "functionSelector": "c2998238",
+            "id": 139,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "enterMarkets",
+            "nodeType": "FunctionDefinition",
+            "overrides": null,
+            "parameters": {
+              "id": 134,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 133,
+                  "name": "cTokens",
+                  "nodeType": "VariableDeclaration",
+                  "overrides": null,
+                  "scope": 139,
+                  "src": "74:26:2",
+                  "stateVariable": false,
+                  "storageLocation": "calldata",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_address_$dyn_calldata_ptr",
+                    "typeString": "address[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 131,
+                      "name": "address",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "74:7:2",
+                      "stateMutability": "nonpayable",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_address",
+                        "typeString": "address"
+                      }
+                    },
+                    "id": 132,
+                    "length": null,
+                    "nodeType": "ArrayTypeName",
+                    "src": "74:9:2",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_address_$dyn_storage_ptr",
+                      "typeString": "address[]"
+                    }
+                  },
+                  "value": null,
+                  "visibility": "internal"
+                }
+              ],
+              "src": "73:28:2"
+            },
+            "returnParameters": {
+              "id": 138,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 137,
+                  "name": "",
+                  "nodeType": "VariableDeclaration",
+                  "overrides": null,
+                  "scope": 139,
+                  "src": "120:13:2",
+                  "stateVariable": false,
+                  "storageLocation": "memory",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_uint256_$dyn_memory_ptr",
+                    "typeString": "uint256[]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 135,
+                      "name": "uint",
+                      "nodeType": "ElementaryTypeName",
+                      "src": "120:4:2",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_uint256",
+                        "typeString": "uint256"
+                      }
+                    },
+                    "id": 136,
+                    "length": null,
+                    "nodeType": "ArrayTypeName",
+                    "src": "120:6:2",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
+                      "typeString": "uint256[]"
+                    }
+                  },
+                  "value": null,
+                  "visibility": "internal"
+                }
+              ],
+              "src": "119:15:2"
+            },
+            "scope": 140,
+            "src": "52:83:2",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 141,
+        "src": "25:112:2"
+      }
+    ],
+    "src": "0:137:2"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.6.0+commit.26b70077.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.3.2",
+  "updatedAt": "2020-12-10T04:47:34.678Z",
+  "devdoc": {
+    "methods": {}
+  },
+  "userdoc": {
+    "methods": {}
+  }
+}
